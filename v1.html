@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Tetris</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">Score: 0</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer;
+        let grid = [];
+        let currentPiece;
+        let score = 0;
+        const GRID_WIDTH = 10;
+        const GRID_HEIGHT = 20;
+        const GRID_DEPTH = 1;
+
+        // Tetromino shapes
+        const SHAPES = {
+            I: [
+                [1, 1, 1, 1]
+            ],
+            O: [
+                [1, 1],
+                [1, 1]
+            ],
+            T: [
+                [0, 1, 0],
+                [1, 1, 1]
+            ],
+            L: [
+                [1, 0],
+                [1, 0],
+                [1, 1]
+            ]
+        };
+
+        // Initialize the scene
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Set camera position
+            camera.position.z = 15;
+            camera.position.y = 10;
+            camera.rotation.x = -0.5;
+
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(10, 10, 10);
+            scene.add(directionalLight);
+
+            // Initialize grid
+            initGrid();
+
+            // Create initial piece
+            createNewPiece();
+
+            // Add event listeners
+            document.addEventListener('keydown', handleInput);
+
+            // Start game loop
+            animate();
+        }
+
+        function initGrid() {
+            // Create grid container
+            const gridGeometry = new THREE.BoxGeometry(GRID_WIDTH, GRID_HEIGHT, GRID_DEPTH);
+            const gridMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x000000, 
+                transparent: true, 
+                opacity: 0.2 
+            });
+            const gridContainer = new THREE.Mesh(gridGeometry, gridMaterial);
+            scene.add(gridContainer);
+            gridContainer.position.set(GRID_WIDTH/2 - 0.5, GRID_HEIGHT/2 - 0.5, 0);
+
+            // Initialize empty grid
+            for(let y = 0; y < GRID_HEIGHT; y++) {
+                grid[y] = [];
+                for(let x = 0; x < GRID_WIDTH; x++) {
+                    grid[y][x] = null;
+                }
+            }
+        }
+
+        function createNewPiece() {
+            const shapes = Object.keys(SHAPES);
+            const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
+            const shape = SHAPES[randomShape];
+            
+            currentPiece = {
+                shape: shape,
+                x: Math.floor(GRID_WIDTH / 2) - Math.floor(shape[0].length / 2),
+                y: GRID_HEIGHT - shape.length,
+                mesh: new THREE.Group()
+            };
+
+            // Create blocks for the piece
+            for(let y = 0; y < shape.length; y++) {
+                for(let x = 0; x < shape[y].length; x++) {
+                    if(shape[y][x]) {
+                        const blockGeometry = new THREE.BoxGeometry(1, 1, 1);
+                        const blockMaterial = new THREE.MeshPhongMaterial({ color: getRandomColor() });
+                        const block = new THREE.Mesh(blockGeometry, blockMaterial);
+                        block.position.set(x, y, 0);
+                        currentPiece.mesh.add(block);
+                    }
+                }
+            }
+
+            scene.add(currentPiece.mesh);
+            updatePiecePosition();
+        }
+
+        function getRandomColor() {
+            const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        function updatePiecePosition() {
+            currentPiece.mesh.position.set(
+                currentPiece.x,
+                currentPiece.y,
+                0
+            );
+        }
+
+        function handleInput(event) {
+            switch(event.key) {
+                case 'ArrowLeft':
+                    if(canMove(-1, 0)) {
+                        currentPiece.x--;
+                        updatePiecePosition();
+                    }
+                    break;
+                case 'ArrowRight':
+                    if(canMove(1, 0)) {
+                        currentPiece.x++;
+                        updatePiecePosition();
+                    }
+                    break;
+                case 'ArrowDown':
+                    if(canMove(0, -1)) {
+                        currentPiece.y--;
+                        updatePiecePosition();
+                    }
+                    break;
+                case 'ArrowUp':
+                    rotatePiece();
+                    break;
+            }
+        }
+
+        function canMove(deltaX, deltaY) {
+            const newX = currentPiece.x + deltaX;
+            const newY = currentPiece.y + deltaY;
+            
+            for(let y = 0; y < currentPiece.shape.length; y++) {
+                for(let x = 0; x < currentPiece.shape[y].length; x++) {
+                    if(currentPiece.shape[y][x]) {
+                        const gridX = newX + x;
+                        const gridY = newY + y;
+                        
+                        if(gridX < 0 || gridX >= GRID_WIDTH || 
+                           gridY < 0 || gridY >= GRID_HEIGHT ||
+                           (grid[gridY] && grid[gridY][gridX])) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        function rotatePiece() {
+            const newShape = [];
+            const height = currentPiece.shape[0].length;
+            const width = currentPiece.shape.length;
+
+            for(let y = 0; y < height; y++) {
+                newShape[y] = [];
+                for(let x = 0; x < width; x++) {
+                    newShape[y][x] = currentPiece.shape[width - 1 - x][y];
+                }
+            }
+
+            const originalShape = currentPiece.shape;
+            currentPiece.shape = newShape;
+
+            if(!canMove(0, 0)) {
+                currentPiece.shape = originalShape;
+            } else {
+                // Rotate the mesh
+                currentPiece.mesh.rotation.z -= Math.PI/2;
+            }
+        }
+
+        function lockPiece() {
+            for(let y = 0; y < currentPiece.shape.length; y++) {
+                for(let x = 0; x < currentPiece.shape[y].length; x++) {
+                    if(currentPiece.shape[y][x]) {
+                        const gridY = currentPiece.y + y;
+                        const gridX = currentPiece.x + x;
+                        if(gridY >= 0 && gridY < GRID_HEIGHT) {
+                            grid[gridY][gridX] = currentPiece.mesh.children[0].material.color;
+                        }
+                    }
+                }
+            }
+
+            scene.remove(currentPiece.mesh);
+            checkLines();
+            createNewPiece();
+        }
+
+        function checkLines() {
+            for(let y = 0; y < GRID_HEIGHT; y++) {
+                let complete = true;
+                for(let x = 0; x < GRID_WIDTH; x++) {
+                    if(!grid[y][x]) {
+                        complete = false;
+                        break;
+                    }
+                }
+                if(complete) {
+                    clearLine(y);
+                    y--;
+                    score += 100;
+                    document.getElementById('score').textContent = `Score: ${score}`;
+                }
+            }
+        }
+
+        function clearLine(line) {
+            // Remove blocks from scene
+            scene.children = scene.children.filter(child => {
+                const shouldKeep = child.position.y !== line;
+                if(!shouldKeep) {
+                    scene.remove(child);
+                }
+                return shouldKeep;
+            });
+
+            // Move lines down
+            for(let y = line; y < GRID_HEIGHT - 1; y++) {
+                grid[y] = grid[y + 1].slice();
+                // Update block positions
+                scene.children.forEach(child => {
+                    if(child.position.y > line) {
+                        child.position.y--;
+                    }
+                });
+            }
+
+            // Clear top line
+            grid[GRID_HEIGHT - 1] = new Array(GRID_WIDTH).fill(null);
+        }
+
+        let lastTime = 0;
+        const dropInterval = 1000; // 1 second
+
+        function animate(currentTime) {
+            requestAnimationFrame(animate);
+
+            // Handle piece dropping
+            if(currentTime - lastTime > dropInterval) {
+                if(canMove(0, -1)) {
+                    currentPiece.y--;
+                    updatePiecePosition();
+                } else {
+                    lockPiece();
+                }
+                lastTime = currentTime;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Start the game
+        init();
+
+        // Handle window resizing
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
