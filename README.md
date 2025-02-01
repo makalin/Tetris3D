@@ -2,6 +2,8 @@
 
 A modern implementation of the classic Tetris game built with Three.js, featuring 3D graphics and enhanced gameplay mechanics.
 
+Live Preview: https://makalin.github.io/Tetris3D/
+
 ## Features
 
 - 3D graphics with dynamic lighting and shadows
