@@ -22,12 +22,12 @@ No special prerequisites are needed. The game runs in any modern web browser.
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/3d-tetris.git
+git clone https://github.com/makalin/Tetris3D.git
 ```
 
 2. Navigate to the project directory:
 ```bash
-cd 3d-tetris
+cd Tetris3D
 ```
 
 3. Open `index.html` in your web browser.
